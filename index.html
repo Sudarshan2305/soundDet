@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sound Detector Timer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: linear-gradient(135deg, #1d2b64, #f8cdda);
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #ffffff;
+    }
+
+    .container {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 40px 30px;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      width: 320px;
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 25px;
+      color: #f8cdda;
+    }
+
+    #timer {
+      font-size: 60px;
+      font-weight: bold;
+      margin: 15px 0;
+      color: #00ffcc;
+    }
+
+    .sound-meter {
+      margin: 20px auto;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: conic-gradient(#00ffff 0% 0%, #444444 0% 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-weight: bold;
+      position: relative;
+      color: #fff;
+      transition: background 0.3s ease;
+    }
+
+    .sound-meter::after {
+      content: '%';
+      position: absolute;
+      bottom: 35px;
+      font-size: 16px;
+      opacity: 0.7;
+    }
+
+    #status {
+      font-size: 16px;
+      margin-top: 15px;
+      color: #eeeeee;
+      min-height: 24px;
+    }
+
+    @media (max-width: 400px) {
+      .container {
+        width: 90%;
+      }
+      #timer {
+        font-size: 48px;
+      }
+      .sound-meter {
+        width: 100px;
+        height: 100px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔊 Sound Detector Timer</h1>
+    <div id="timer">90</div>
+    <div class="sound-meter" id="soundLevel">0</div>
+    <div id="status">Initializing microphone...</div>
+  </div>
+
+  <script>
+    let timer = 90;
+    let interval;
+    const timerElement = document.getElementById("timer");
+    const statusElement = document.getElementById("status");
+    const soundLevelElement = document.getElementById("soundLevel");
+
+    const THRESHOLD = 40; // Change threshold to 40%
+
+    function startTimer() {
+      if (interval) clearInterval(interval);
+
+      timer = 90;
+      timerElement.textContent = timer;
+
+      interval = setInterval(() => {
+        timer--;
+        timerElement.textContent = timer;
+
+        if (timer <= 0) {
+          clearInterval(interval);
+          statusElement.textContent = "⏰ Timer finished!";
+        }
+      }, 1000);
+    }
+
+    async function initMic() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const analyser = audioContext.createAnalyser();
+        const microphone = audioContext.createMediaStreamSource(stream);
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        microphone.connect(analyser);
+
+        function updateUI(volumePercent) {
+          soundLevelElement.textContent = volumePercent;
+          soundLevelElement.style.background = `conic-gradient(#00ffff 0% ${volumePercent}%, #444 0% 100%)`;
+        }
+
+        function checkVolume() {
+          analyser.getByteFrequencyData(dataArray);
+          let values = 0;
+
+          for (let i = 0; i < dataArray.length; i++) {
+            values += dataArray[i];
+          }
+
+          const average = values / dataArray.length;
+          const volumePercent = Math.min(100, ((average / 255) * 100).toFixed(0));
+
+          updateUI(volumePercent);
+
+          if (volumePercent > THRESHOLD) {
+            statusElement.textContent = `🔊 Sound (${volumePercent}%) exceeded ${THRESHOLD}% — Timer reset`;
+            startTimer();
+          } else {
+            statusElement.textContent = "🎧 Listening...";
+          }
+
+          requestAnimationFrame(checkVolume);
+        }
+
+        statusElement.textContent = "🎤 Microphone active";
+        checkVolume();
+      } catch (err) {
+        console.error("Microphone error:", err);
+        statusElement.textContent = "❌ Microphone access denied.";
+      }
+    }
+
+    window.onload = () => {
+      startTimer();
+      initMic();
+    };
+  </script>
+</body>
+</html>
